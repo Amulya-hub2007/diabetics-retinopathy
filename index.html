@@ -1,0 +1,1160 @@
+!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionCare AI — Explainable Diabetic Retinopathy Screening</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
+<script>
+ tailwind.config = {
+  theme: {
+   extend: {
+    fontFamily: { sans:['Inter','system-ui','sans-serif'], display:['Plus Jakarta Sans','Inter','sans-serif'], mono:['JetBrains Mono','monospace'] },
+    colors: {
+     navy:'#0B2D4A',
+     teal:'#0E7C7B',
+     tealDark:'#0A5C5B',
+     paper:'#F6F8FB',
+     line:'#E2E8F0',
+     amberRisk:'#B45309',
+     roseRisk:'#9F1239'
+    }
+   }
+  }
+ }
+</script>
+<style>
+ *{scroll-behavior:smooth}
+ .glass{backdrop-filter:blur(12px)}
+ .scan-line{animation:scan 2.2s ease-in-out infinite}
+ @keyframes scan{0%{top:8%}50%{top:78%}100%{top:8%}}
+ .pulse-dot{animation:pulseDot 1.8s infinite}
+ @keyframes pulseDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.92)}}
+ .shimmer{background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 37%,#e2e8f0 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite}
+ @keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+ .heatmap-dot{filter:blur(8px);mix-blend-mode:multiply}
+ ::-webkit-scrollbar{width:6px;height:6px}
+ ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:99px}
+</style>
+</head>
+<body class="bg-paper text-slate-800 font-sans antialiased">
+<!-- Top Bar -->
+<div class="bg-navy text-white text-[11px] tracking-wide">
+ <div class="max-w-[1280px] mx-auto px-4 md:px-6 h-8 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+   <span class="hidden md:inline opacity-80">Screen • Explain • Prioritise • Refer — Decision support, not diagnosis</span>
+   <span class="md:hidden opacity-90 font-medium">Screen • Explain • Prioritise • Refer</span>
+   <span class="hidden lg:inline-flex items-center gap-1.5 ml-2 pl-3 border-l border-white/20"><i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Prototype Offline Mode Available</span>
+  </div>
+  <div class="flex items-center gap-3">
+   <span class="hidden sm:inline-flex items-center gap-1.5 bg-white/10 px-2.5 py-1 rounded-full"><span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span> Demo Mode Active</span>
+   <button onclick="startPresentation()" class="hidden md:inline-flex items-center gap-1.5 bg-[#0EA5A0] hover:bg-tealDark text-white px-3 py-1 rounded-full font-semibold transition"> <i data-lucide="play" class="w-3 h-3"></i> Presentation Mode</button>
+  </div>
+ </div>
+</div>
+
+<!-- Navigation -->
+<header class="sticky top-0 z-40 bg-white/95 glass border-b border-line">
+ <div class="max-w-[1280px] mx-auto px-4 md:px-6 h-[64px] flex items-center justify-between gap-4">
+  <div class="flex items-center gap-3">
+   <div class="w-9 h-9 rounded-xl bg-navy flex items-center justify-center text-white"><i data-lucide="eye" class="w-5 h-5"></i></div>
+   <div>
+    <div class="font-display font-bold leading-none text-navy text-[17px]">VisionCare AI</div>
+    <div class="text-[10px] tracking-[0.14em] font-semibold text-teal uppercase">Rural DR Screening Support</div>
+   </div>
+   <span class="hidden xl:inline-flex ml-2 text-[11px] font-medium px-2.5 py-1 rounded-full bg-teal/10 text-teal border border-teal/20">v1.0 • For Trained Health Workers</span>
+  </div>
+
+  <nav class="hidden lg:flex items-center gap-1 text-sm font-medium">
+   <button data-nav="home" onclick="showPage('home')" class="nav-btn px-3 py-2 rounded-full bg-navy text-white">Home</button>
+   <button data-nav="screening" onclick="showPage('screening')" class="nav-btn px-3 py-2 rounded-full hover:bg-slate-100">Screen</button>
+   <button data-nav="results" onclick="showPage('results')" class="nav-btn px-3 py-2 rounded-full hover:bg-slate-100">Results</button>
+   <button data-nav="history" onclick="showPage('history')" class="nav-btn px-3 py-2 rounded-full hover:bg-slate-100">History</button>
+   <button data-nav="dashboard" onclick="showPage('dashboard')" class="nav-btn px-3 py-2 rounded-full hover:bg-slate-100">Dashboard</button>
+   <button data-nav="privacy" onclick="showPage('privacy')" class="nav-btn px-3 py-2 rounded-full hover:bg-slate-100">Privacy & Tech</button>
+  </nav>
+
+  <div class="flex items-center gap-2">
+   <div class="hidden md:flex items-center gap-2 mr-1">
+    <span class="text-xs font-semibold text-slate-600">Rural Mode</span>
+    <button id="ruralToggle" onclick="toggleRural()" class="w-[44px] h-[26px] rounded-full bg-slate-200 relative transition">
+     <span id="ruralKnob" class="absolute top-[3px] left-[3px] w-[20px] h-[20px] rounded-full bg-white shadow transition"></span>
+    </button>
+   </div>
+   <button onclick="showPage('register')" class="hidden sm:inline-flex items-center gap-2 bg-teal hover:bg-tealDark text-white px-4 py-2.5 rounded-full font-semibold text-sm transition"> <i data-lucide="plus" class="w-4 h-4"></i> New Screening</button>
+   <button onclick="toggleMobile()" class="lg:hidden p-2 rounded-xl border border-line"><i data-lucide="menu" class="w-5 h-5"></i></button>
+  </div>
+ </div>
+ <div id="mobileNav" class="hidden lg:hidden border-t border-line bg-white px-4 py-3">
+  <div class="grid grid-cols-3 gap-2 text-sm">
+   <button onclick="showPage('home');toggleMobile()" class="py-2.5 rounded-xl bg-navy text-white font-semibold">Home</button>
+   <button onclick="showPage('screening');toggleMobile()" class="py-2.5 rounded-xl bg-slate-100 font-semibold">Screen</button>
+   <button onclick="showPage('history');toggleMobile()" class="py-2.5 rounded-xl bg-slate-100 font-semibold">History</button>
+   <button onclick="showPage('dashboard');toggleMobile()" class="py-2.5 rounded-xl bg-slate-100 font-semibold">Dashboard</button>
+   <button onclick="showPage('results');toggleMobile()" class="py-2.5 rounded-xl bg-slate-100 font-semibold">Results</button>
+   <button onclick="showPage('privacy');toggleMobile()" class="py-2.5 rounded-xl bg-slate-100 font-semibold">Privacy</button>
+  </div>
+  <button onclick="showPage('register')" class="mt-3 w-full bg-teal text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i> New Screening</button>
+ </div>
+</header>
+
+<main class="max-w-[1280px] mx-auto px-4 md:px-6 pb-10">
+ <!-- HOME -->
+ <section id="page-home" class="page">
+  <div class="grid lg:grid-cols-[1.05fr_0.95fr] gap-6 mt-6">
+   <!-- Left -->
+   <div class="bg-white rounded-[24px] border border-line p-6 md:p-8 shadow-sm">
+    <div class="inline-flex items-center gap-2 text-xs font-semibold tracking-wide">
+     <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500 pulse-dot"></span> Explainable AI • Decision Support</span>
+     <span class="hidden sm:inline-flex px-2.5 py-1 rounded-full bg-slate-50 border border-line text-slate-600"><i data-lucide="map-pin" class="w-3 h-3"></i> Built for Rural India</span>
+    </div>
+    <h1 class="font-display font-bold text-navy leading-[0.95] text-[32px] md:text-[44px] mt-4">Explainable AI for<br><span class="text-teal">Diabetic Retinopathy</span><br>Screening</h1>
+    <p class="text-slate-600 text-[15px] leading-relaxed mt-4 max-w-[560px]">Assist trained healthcare workers to <span class="font-semibold text-slate-800">Screen → Explain → Prioritise → Refer</span>. Upload a fundus image, review what the AI looked at, and guide the patient to the right next step — with the ophthalmologist always in the loop.</p>
+
+    <div class="flex flex-wrap gap-3 mt-6">
+     <button onclick="showPage('register')" class="inline-flex items-center gap-2 bg-teal hover:bg-tealDark text-white px-6 py-3.5 rounded-full font-semibold shadow-sm transition"> <i data-lucide="scan-eye" class="w-5 h-5"></i> Start Screening <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+     <button onclick="showPage('history')" class="inline-flex items-center gap-2 bg-white border border-line hover:bg-slate-50 px-6 py-3.5 rounded-full font-semibold transition"><i data-lucide="history" class="w-5 h-5"></i> View Patient History</button>
+     <button onclick="startPresentation()" class="inline-flex items-center gap-2 bg-navy text-white px-5 py-3.5 rounded-full font-semibold lg:hidden"><i data-lucide="play" class="w-4 h-4"></i> Demo</button>
+    </div>
+
+    <div class="grid grid-cols-3 gap-3 mt-6">
+     <div class="rounded-2xl bg-slate-50 border border-line p-4">
+      <div class="w-8 h-8 rounded-full bg-white border border-line flex items-center justify-center"><i data-lucide="upload" class="w-4 h-4 text-navy"></i></div>
+      <div class="font-semibold text-navy mt-3 text-sm">1. Screen</div>
+      <div class="text-xs text-slate-600 leading-snug">Capture or upload fundus image</div>
+     </div>
+     <div class="rounded-2xl bg-slate-50 border border-line p-4">
+      <div class="w-8 h-8 rounded-full bg-white border border-line flex items-center justify-center"><i data-lucide="brain" class="w-4 h-4 text-teal"></i></div>
+      <div class="font-semibold text-navy mt-3 text-sm">2. Explain</div>
+      <div class="text-xs text-slate-600 leading-snug">See which regions influenced AI</div>
+     </div>
+     <div class="rounded-2xl bg-slate-50 border border-line p-4">
+      <div class="w-8 h-8 rounded-full bg-white border border-line flex items-center justify-center"><i data-lucide="git-branch" class="w-4 h-4 text-navy"></i></div>
+      <div class="font-semibold text-navy mt-3 text-sm">3. Refer</div>
+      <div class="text-xs text-slate-600 leading-snug">Prioritise & guide next action</div>
+     </div>
+    </div>
+
+    <div class="mt-4 flex items-center gap-2 text-[11px] font-medium text-slate-500 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+     <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 shrink-0"></i>
+     <span><span class="font-bold text-amber-800">Important:</span> This is a screening support tool. It does not replace an ophthalmologist and is not a final diagnosis. All “refer” decisions must be reviewed by qualified medical staff.</span>
+    </div>
+   </div>
+
+   <!-- Right Visual -->
+   <div class="bg-navy rounded-[24px] p-5 md:p-6 text-white relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10" style="background: radial-gradient(600px 300px at 80% 0%, #2DD4BF 0%, transparent 60%), radial-gradient(500px 400px at 0% 100%, #38BDF8 0%, transparent 50%);"></div>
+    <div class="relative flex items-center justify-between">
+     <div class="text-xs tracking-widest font-semibold opacity-80">LIVE RETINAL ANALYSIS • DEMO VIEW</div>
+     <span class="text-[11px] px-2.5 py-1 rounded-full bg-white/10 border border-white/15">Image Quality — Good</span>
+    </div>
+
+    <div class="relative mt-4 grid md:grid-cols-[1.15fr_0.85fr] gap-4">
+     <div class="rounded-2xl overflow-hidden bg-[#0F2942] border border-white/10 p-3">
+      <div class="relative rounded-xl overflow-hidden bg-black aspect-[4/3] flex items-center justify-center">
+       <img src="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?q=80&w=800&auto=format&fit=crop" alt="fundus" class="w-full h-full object-cover opacity-90">
+       <div class="absolute inset-0 rounded-xl border border-white/10"></div>
+       <div class="absolute left-3 right-3 h-[2px] bg-cyan-300/90 shadow-[0_0_12px_rgba(34,211,238,0.9)] scan-line"></div>
+       <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between text-[10px] font-mono">
+        <span class="bg-black/60 px-2 py-1 rounded-full border border-white/10">FOV 45° • MACULA CENTRED</span>
+        <span class="bg-emerald-500 text-white px-2 py-1 rounded-full">● REC</span>
+       </div>
+      </div>
+      <div class="grid grid-cols-3 gap-2 mt-3 text-xs">
+       <div class="bg-white/5 border border-white/10 rounded-xl px-3 py-2"><div class="opacity-60">Focus</div><div class="font-semibold text-emerald-300">Sharp</div></div>
+       <div class="bg-white/5 border border-white/10 rounded-xl px-3 py-2"><div class="opacity-60">Illumination</div><div class="font-semibold text-emerald-300">Even</div></div>
+       <div class="bg-white/5 border border-white/10 rounded-xl px-3 py-2"><div class="opacity-60">Field</div><div class="font-semibold text-amber-300">Adequate</div></div>
+      </div>
+     </div>
+
+     <div class="space-y-3">
+      <div class="rounded-2xl bg-white text-slate-800 p-4">
+       <div class="text-xs font-bold tracking-wide text-slate-500">AI ATTENTION MAP</div>
+       <div class="relative mt-3 rounded-xl overflow-hidden bg-slate-900 aspect-[4/3] border border-line">
+        <img src="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?q=80&w=800&auto=format&fit=crop" class="w-full h-full object-cover opacity-60">
+        <div class="absolute inset-0">
+         <span class="heatmap-dot absolute w-16 h-16 rounded-full bg-red-500/60" style="left:34%;top:32%"></span>
+         <span class="heatmap-dot absolute w-12 h-12 rounded-full bg-amber-400/60" style="left:58%;top:44%"></span>
+         <span class="heatmap-dot absolute w-20 h-20 rounded-full bg-red-500/45" style="left:28%;top:58%"></span>
+         <span class="heatmap-dot absolute w-10 h-10 rounded-full bg-amber-400/70" style="left:62%;top:68%"></span>
+        </div>
+        <div class="absolute bottom-2 left-2 bg-white/95 px-2 py-1 rounded-full text-[10px] font-semibold border">High influence • Red</div>
+       </div>
+       <div class="mt-3 space-y-2 text-xs">
+        <div class="flex gap-2"><span class="w-2 h-2 rounded-full bg-red-500 mt-1"></span><span><span class="font-semibold">Microaneurysms & haemorrhages</span> near arcade — moderate density</span></div>
+        <div class="flex gap-2"><span class="w-2 h-2 rounded-full bg-amber-400 mt-1"></span><span>Hard exudates temporal to macula</span></div>
+       </div>
+      </div>
+      <div class="rounded-2xl bg-[#0EA5A0] p-4">
+       <div class="text-xs font-bold tracking-wide opacity-90">RISK & NEXT STEP</div>
+       <div class="mt-2 flex items-center gap-2"><span class="px-2.5 py-1 rounded-full bg-amber-400 text-amber-900 text-xs font-extrabold">MEDIUM RISK</span><span class="text-sm font-semibold">Refer within 2–4 weeks</span></div>
+       <div class="text-xs opacity-90 mt-1 leading-snug">Non-urgent referral to ophthalmology. Share report with patient in preferred language.</div>
+      </div>
+     </div>
+    </div>
+
+    <div class="relative mt-4 grid grid-cols-3 gap-3 text-center">
+     <div class="bg-white/5 border border-white/10 rounded-2xl py-3"><div class="text-xl font-extrabold">2,847</div><div class="text-[11px] opacity-70">Screenings (demo)</div></div>
+     <div class="bg-white/5 border border-white/10 rounded-2xl py-3"><div class="text-xl font-extrabold">312</div><div class="text-[11px] opacity-70">Referred</div></div>
+     <div class="bg-white/5 border border-white/10 rounded-2xl py-3"><div class="text-xl font-extrabold">18</div><div class="text-[11px] opacity-70">PHCs Covered</div></div>
+    </div>
+   </div>
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-4 mt-4">
+   <div class="bg-white rounded-2xl border border-line p-5">
+    <div class="w-9 h-9 rounded-xl bg-teal/10 flex items-center justify-center text-teal"><i data-lucide="users" class="w-5 h-5"></i></div>
+    <div class="font-semibold text-navy mt-3">For Health Workers</div>
+    <div class="text-sm text-slate-600 leading-relaxed">Large buttons, guided steps, and plain-language explanations. Works on tablet and low-cost Android phones.</div>
+   </div>
+   <div class="bg-white rounded-2xl border border-line p-5">
+    <div class="w-9 h-9 rounded-xl bg-navy/10 flex items-center justify-center text-navy"><i data-lucide="stethoscope" class="w-5 h-5"></i></div>
+    <div class="font-semibold text-navy mt-3">For Doctors</div>
+    <div class="text-sm text-slate-600 leading-relaxed">Triage by risk, review AI attention, and prioritise referrals without replacing clinical judgement.</div>
+   </div>
+   <div class="bg-white rounded-2xl border border-line p-5">
+    <div class="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700"><i data-lucide="heart-handshake" class="w-5 h-5"></i></div>
+    <div class="font-semibold text-navy mt-3">For Patients</div>
+    <div class="text-sm text-slate-600 leading-relaxed">Simple visuals and local-language summaries help families understand next steps.</div>
+   </div>
+  </div>
+ </section>
+
+ <!-- REGISTER -->
+ <section id="page-register" class="page hidden">
+  <div class="mt-6 bg-white rounded-[24px] border border-line shadow-sm overflow-hidden">
+   <div class="px-6 md:px-8 py-6 border-b border-line flex flex-wrap items-center justify-between gap-3">
+    <div>
+     <div class="inline-flex items-center gap-2 text-xs font-semibold"><span class="w-6 h-6 rounded-full bg-navy text-white flex items-center justify-center text-xs">1</span> Patient Registration <span class="hidden sm:inline text-slate-400 font-normal">— Step 1 of 4</span></div>
+     <h2 class="font-display font-bold text-navy text-2xl mt-1">Register patient for screening</h2>
+     <p class="text-sm text-slate-600">Collect minimal essential information. Data is stored locally on this device in Rural Mode.</p>
+    </div>
+    <div class="flex items-center gap-2 text-xs">
+     <span class="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold flex items-center gap-1.5"><i data-lucide="lock" class="w-3.5 h-3.5"></i> Consent required</span>
+     <span class="px-3 py-1.5 rounded-full bg-slate-50 border border-line font-medium">Demo data available</span>
+    </div>
+   </div>
+
+   <form id="registerForm" class="p-6 md:p-8 grid lg:grid-cols-[1.2fr_0.8fr] gap-8">
+    <div class="space-y-5">
+     <div class="grid md:grid-cols-2 gap-4">
+      <label class="space-y-1.5"><span class="text-sm font-semibold text-slate-700">Full name <span class="text-rose-600">*</span></span><input required name="name" placeholder="e.g., Ramesh Kumar" class="w-full rounded-xl border border-line px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal"></label>
+      <label class="space-y-1.5"><span class="text-sm font-semibold text-slate-700">Age <span class="text-rose-600">*</span></span><input required name="age" type="number" min="10" max="100" placeholder="e.g., 58" class="w-full rounded-xl border border-line px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal/30"></label>
+      <label class="space-y-1.5"><span class="text-sm font-semibold text-slate-700">Gender</span><select name="gender" class="w-full rounded-xl border border-line px-4 py-3 bg-white"><option>Male</option><option>Female</option><option>Other</option></select></label>
+      <label class="space-y-1.5"><span class="text-sm font-semibold text-slate-700">Phone (optional)</span><input name="phone" placeholder="98XXXXXXXX" class="w-full rounded-xl border border-line px-4 py-3"></label>
+     </div>
+     <div class="grid md:grid-cols-2 gap-4">
+      <label class="space-y-1.5"><span class="text-sm font-semibold text-slate-700">Village / PHC Area</span><input name="village" placeholder="e.g., Nalgonda, Telangana" class="w-full rounded-xl border border-line px-4 py-3"></label>
+      <label class="space-y-1.5"><span class="text-sm font-semibold text-slate-700">Diabetes duration</span><select name="diabetes" class="w-full rounded-xl border border-line px-4 py-3 bg-white"><option>&lt; 2 years</option><option>2–5 years</option><option>5–10 years</option><option>&gt; 10 years</option><option>Unknown</option></select></label>
+     </div>
+     <div class="grid md:grid-cols-2 gap-4">
+      <label class="space-y-1.5"><span class="text-sm font-semibold text-slate-700">Last eye screening</span><select name="lastScreen" class="w-full rounded-xl border border-line px-4 py-3 bg-white"><option>Never</option><option>&lt; 6 months ago</option><option>6–12 months ago</option><option>&gt; 1 year ago</option></select></label>
+      <label class="space-y-1.5"><span class="text-sm font-semibold text-slate-700">Known hypertension?</span><select name="htn" class="w-full rounded-xl border border-line px-4 py-3 bg-white"><option>No</option><option>Yes</option><option>Unknown</option></select></label>
+     </div>
+     <label class="flex items-start gap-3 p-4 rounded-xl bg-slate-50 border border-line">
+      <input type="checkbox" required class="mt-1 w-4 h-4 rounded border-slate-300">
+      <span class="text-sm leading-relaxed text-slate-700"><span class="font-semibold">Patient consent:</span> I have explained that this is an AI-assisted screening support tool, not a final diagnosis, and that personal data will be used only for care and referral. Patient / guardian has consented to screening.</span>
+     </label>
+     <div class="flex flex-wrap gap-3">
+      <button type="submit" class="inline-flex items-center gap-2 bg-teal hover:bg-tealDark text-white px-6 py-3.5 rounded-full font-semibold transition">Continue to image capture <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+      <button type="button" onclick="fillDemoPatient()" class="px-6 py-3.5 rounded-full border border-line font-semibold hover:bg-slate-50">Fill demo data</button>
+      <button type="button" onclick="showPage('home')" class="px-6 py-3.5 rounded-full font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+     </div>
+    </div>
+
+    <div class="space-y-4">
+     <div class="rounded-2xl border border-line bg-slate-50 p-5">
+      <div class="font-semibold text-navy flex items-center gap-2"><i data-lucide="info" class="w-4 h-4"></i> What happens next?</div>
+      <ol class="mt-3 space-y-2.5 text-sm text-slate-700 list-decimal list-inside">
+       <li>Capture or upload fundus photo (one eye at a time)</li>
+       <li>Automatic quality check for focus & illumination</li>
+       <li>AI shows which areas it looked at and why</li>
+       <li>Risk level + clear next action for the health worker</li>
+      </ol>
+      <div class="mt-4 p-3 rounded-xl bg-white border border-line text-xs leading-relaxed"><span class="font-semibold">Tip for camps:</span> Keep the patient’s chin stable, dim ambient light, and centre the optic disc. Retake if glare covers the macula.</div>
+     </div>
+     <div class="rounded-2xl bg-navy text-white p-5">
+      <div class="text-sm font-semibold flex items-center gap-2"><i data-lucide="languages" class="w-4 h-4"></i> Language support</div>
+      <div class="text-sm opacity-80 mt-1">Patient explanations are available in English, Hindi, Tamil, Telugu, Bengali and Marathi with text-to-speech.</div>
+     </div>
+    </div>
+   </form>
+  </div>
+ </section>
+
+ <!-- SCREENING -->
+ <section id="page-screening" class="page hidden">
+  <div class="mt-6 grid lg:grid-cols-[1.25fr_0.75fr] gap-6">
+   <div class="bg-white rounded-[24px] border border-line shadow-sm overflow-hidden">
+    <div class="px-6 py-5 border-b border-line flex items-center justify-between">
+     <div>
+      <div class="text-xs font-bold tracking-widest text-slate-500 flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-navy text-white flex items-center justify-center text-xs">2</span> Retinal Image Screening</div>
+      <h2 class="font-display font-bold text-navy text-xl mt-1">Upload or capture fundus image</h2>
+     </div>
+     <div id="patientChip" class="hidden md:flex items-center gap-3 bg-slate-50 border border-line rounded-full pl-2 pr-4 py-1.5">
+      <span class="w-8 h-8 rounded-full bg-navy text-white flex items-center justify-center text-xs font-bold">RK</span>
+      <div class="text-xs leading-tight"><div class="font-semibold" id="chipName">Ramesh Kumar • 58M</div><div class="text-slate-500" id="chipId">VC-2024-1842</div></div>
+     </div>
+    </div>
+
+    <div class="p-6">
+     <div class="flex items-center gap-2 text-xs font-semibold mb-3">
+      <span class="px-3 py-1.5 rounded-full bg-navy text-white">Right Eye (OD)</span>
+      <span class="px-3 py-1.5 rounded-full border border-line text-slate-600">Left Eye (OS)</span>
+      <span class="ml-auto text-slate-500 font-medium">JPG, JPEG, PNG • max 8 MB</span>
+     </div>
+
+     <div id="dropZone" class="rounded-[20px] border-2 border-dashed border-slate-300 bg-slate-50 p-6 md:p-8 text-center relative overflow-hidden">
+      <input id="fileInput" type="file" accept="image/png,image/jpeg,image/jpg" class="hidden">
+      <div id="dropEmpty">
+       <div class="w-14 h-14 rounded-2xl bg-white border border-line flex items-center justify-center mx-auto shadow-sm"><i data-lucide="image-plus" class="w-7 h-7 text-navy"></i></div>
+       <div class="font-semibold text-navy mt-4">Drag & drop fundus image here</div>
+       <div class="text-sm text-slate-600">or browse from device / camera</div>
+       <div class="flex flex-wrap justify-center gap-3 mt-5">
+        <button onclick="document.getElementById('fileInput').click()" class="px-5 py-2.5 rounded-full bg-teal text-white font-semibold">Browse files</button>
+        <button onclick="useSampleImage()" class="px-5 py-2.5 rounded-full bg-white border border-line font-semibold">Use sample image</button>
+        <button onclick="openCamera()" class="px-5 py-2.5 rounded-full bg-navy text-white font-semibold inline-flex items-center gap-2"><i data-lucide="camera" class="w-4 h-4"></i> Open camera</button>
+       </div>
+       <div class="mt-5 flex flex-wrap justify-center gap-2 text-[11px] font-medium">
+        <span class="px-2.5 py-1 rounded-full bg-white border border-line">Centre macula</span><span class="px-2.5 py-1 rounded-full bg-white border border-line">Avoid glare</span><span class="px-2.5 py-1 rounded-full bg-white border border-line">Keep eye wide open</span>
+       </div>
+      </div>
+
+      <div id="dropPreview" class="hidden text-left">
+       <div class="grid md:grid-cols-[1.2fr_0.8fr] gap-5 items-start">
+        <div class="rounded-2xl overflow-hidden border border-line bg-black aspect-[4/3] relative">
+         <img id="previewImg" src="" alt="preview" class="w-full h-full object-cover">
+         <span class="absolute top-3 left-3 bg-white/95 px-3 py-1 rounded-full text-xs font-bold border">Preview • Right Eye</span>
+         <button onclick="clearImage()" class="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </div>
+        <div class="space-y-3">
+         <div class="font-semibold text-navy">Image quality checks</div>
+         <div class="space-y-2" id="qualityList">
+          <!-- injected -->
+         </div>
+         <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs leading-relaxed hidden" id="retakeHint">
+          <span class="font-bold text-amber-800">Suggestion:</span> Slight blur detected at periphery. If possible, retake with steadier fixation. You may still proceed — AI will flag low-confidence results.
+         </div>
+         <div class="flex gap-2 pt-1">
+          <button onclick="clearImage()" class="flex-1 py-2.5 rounded-full border border-line font-semibold bg-white">Retake</button>
+          <button id="analyseBtn" onclick="startAnalysis()" class="flex-1 py-2.5 rounded-full bg-teal text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled><i data-lucide="sparkles" class="w-4 h-4"></i> Analyse image</button>
+         </div>
+         <div class="text-[11px] text-slate-500">By analysing, you confirm the image is de-identified and consent has been obtained.</div>
+        </div>
+       </div>
+      </div>
+     </div>
+
+     <div class="mt-4 flex items-center gap-2 text-xs">
+      <span class="px-2.5 py-1 rounded-full bg-slate-900 text-white font-mono" id="fileMeta">No file selected</span>
+      <span class="hidden sm:inline text-slate-500">Demo mode simulates AI — no real model call is made. Architecture is API-ready for future integration.</span>
+     </div>
+    </div>
+   </div>
+
+   <div class="space-y-4">
+    <div class="bg-white rounded-[24px] border border-line p-5">
+     <div class="font-semibold text-navy">Patient context</div>
+     <div id="contextCard" class="mt-3 p-4 rounded-2xl bg-slate-50 border border-line text-sm leading-relaxed">
+      <div class="font-semibold" id="ctxName">No patient selected</div>
+      <div class="text-slate-600 text-xs" id="ctxMeta">Register a patient to begin.</div>
+      <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+       <div class="bg-white border border-line rounded-xl px-3 py-2"><div class="text-slate-500">Diabetes</div><div class="font-semibold" id="ctxDiabetes">—</div></div>
+       <div class="bg-white border border-line rounded-xl px-3 py-2"><div class="text-slate-500">Last screening</div><div class="font-semibold" id="ctxLast">—</div></div>
+      </div>
+     </div>
+     <div class="mt-4 text-xs font-semibold text-slate-700">Capture checklist</div>
+     <ul class="mt-2 space-y-2 text-sm text-slate-600">
+      <li class="flex gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-600 mt-0.5"></i> Pupil dilated if protocol allows; dark room</li>
+      <li class="flex gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-600 mt-0.5"></i> No flash reflection on cornea</li>
+      <li class="flex gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-600 mt-0.5"></i> Optic disc and macula visible</li>
+     </ul>
+    </div>
+
+    <div class="rounded-[24px] bg-navy text-white p-5">
+     <div class="text-sm font-bold flex items-center gap-2"><i data-lucide="wifi-off" class="w-4 h-4"></i> Rural / Low-connectivity design</div>
+     <div class="text-sm opacity-80 leading-relaxed mt-1">In Rural Mode, images and results are saved locally and synced when connectivity returns. A “Prototype Offline Mode” banner is shown so the jury sees the design intent.</div>
+     <div class="mt-3 flex items-center gap-2 text-xs"><span id="offlineBadge" class="px-2.5 py-1 rounded-full bg-white/10 border border-white/15">Online — sync enabled</span><span class="opacity-60">Queue: <span id="queueCount">0</span> pending</span></div>
+    </div>
+   </div>
+  </div>
+ </section>
+
+ <!-- ANALYSIS -->
+ <section id="page-analysis" class="page hidden">
+  <div class="mt-6 bg-white rounded-[24px] border border-line shadow-sm overflow-hidden">
+   <div class="px-6 md:px-8 py-6 border-b border-line">
+    <div class="flex items-center gap-2 text-xs font-bold tracking-widest text-teal"><span class="w-2 h-2 rounded-full bg-teal pulse-dot"></span> AI ANALYSIS • DEMO SIMULATION</div>
+    <h2 class="font-display font-bold text-navy text-2xl mt-1">Analysing retinal image…</h2>
+    <p class="text-sm text-slate-600">This is a realistic simulation for the hackathon demo. In production, this would call a validated model via a secure API.</p>
+   </div>
+   <div class="p-6 md:p-8 grid lg:grid-cols-[0.9fr_1.1fr] gap-8 items-start">
+    <div class="rounded-2xl overflow-hidden border border-line bg-slate-900 aspect-[4/3] relative">
+     <img id="analysisImg" src="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?q=80&w=800&auto=format&fit=crop" class="w-full h-full object-cover opacity-80">
+     <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+     <div class="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+      <span class="bg-white text-slate-900 px-3 py-1.5 rounded-full text-xs font-bold" id="analysisPct">0% • Initialising</span>
+      <span class="bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold">DEMO MODEL v0.9</span>
+     </div>
+     <div class="absolute top-3 left-3 bg-black/60 text-white px-2.5 py-1 rounded-full text-[11px] font-mono border border-white/15">224 × 224 • CLAHE • NORMALISED</div>
+    </div>
+
+    <div>
+     <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden border border-line"><div id="progressBar" class="h-full bg-teal transition-all" style="width:6%"></div></div>
+     <div class="mt-6 space-y-4" id="stepList">
+      <div class="flex gap-3" data-step="1"><div class="w-8 h-8 rounded-full bg-teal text-white flex items-center justify-center shrink-0"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i></div><div><div class="font-semibold text-navy text-sm">Image validation & de-identification</div><div class="text-xs text-slate-600">Checking format, stripping EXIF, confirming fundus field</div><div class="mt-2 h-1.5 w-48 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-teal shimmer" style="width:100%"></div></div></div></div>
+      <div class="flex gap-3 opacity-40" data-step="2"><div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0 text-slate-600">2</div><div><div class="font-semibold text-sm">Quality assessment</div><div class="text-xs text-slate-600">Focus, illumination, artefacts — confidence calibration</div></div></div>
+      <div class="flex gap-3 opacity-40" data-step="3"><div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0 text-slate-600">3</div><div><div class="font-semibold text-sm">Lesion pattern analysis (explainable)</div><div class="text-xs text-slate-600">Attention maps for microaneurysms, haemorrhages, exudates</div></div></div>
+      <div class="flex gap-3 opacity-40" data-step="4"><div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0 text-slate-600">4</div><div><div class="font-semibold text-sm">Risk stratification & next-action</div><div class="text-xs text-slate-600">Mapping findings to referral guidance</div></div></div>
+     </div>
+     <div class="mt-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs leading-relaxed">
+      <span class="font-bold text-amber-800">Jury note:</span> All predictions here are simulated. The interface shows <span class="font-semibold">why</span> the model would refer — attention overlays, confidence, and quality — to keep the ophthalmologist in control.
+     </div>
+     <div class="mt-4 flex gap-3">
+      <button onclick="skipAnalysis()" class="px-5 py-2.5 rounded-full border border-line font-semibold bg-white">Skip to results</button>
+      <button onclick="showPage('screening')" class="px-5 py-2.5 rounded-full bg-slate-100 font-semibold">Cancel</button>
+     </div>
+    </div>
+   </div>
+  </div>
+ </section>
+
+ <!-- RESULTS -->
+ <section id="page-results" class="page hidden">
+  <div class="mt-6 space-y-4">
+   <!-- Top summary -->
+   <div class="bg-white rounded-[24px] border border-line shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-line flex flex-wrap items-center justify-between gap-3">
+     <div class="flex items-center gap-3">
+      <span class="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-4 h-4"></i> Screening Complete</span>
+      <span class="text-xs font-mono bg-slate-900 text-white px-2.5 py-1 rounded-full" id="resId">VC-2024-1842</span>
+      <span class="text-xs text-slate-500" id="resDate">18 Nov 2024 • 11:42 AM</span>
+     </div>
+     <div class="flex items-center gap-2">
+      <button onclick="window.print()" class="px-4 py-2 rounded-full border border-line font-semibold text-sm bg-white">Print report</button>
+      <button onclick="shareReport()" class="px-4 py-2 rounded-full bg-navy text-white font-semibold text-sm">Share referral</button>
+     </div>
+    </div>
+
+    <div class="p-6 grid lg:grid-cols-4 gap-4">
+     <div class="rounded-2xl border border-line p-4 bg-slate-50"><div class="text-[11px] font-bold tracking-widest text-slate-500">IMAGE QUALITY</div><div id="resQuality" class="mt-2 inline-flex px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-bold">Good — Usable</div><div class="text-xs text-slate-600 mt-2">Focus sharp, illumination even. No major artefacts.</div><div class="mt-3 text-xs font-mono bg-white border border-line rounded-full px-3 py-1 inline-flex">Confidence calibrated</div></div>
+     <div class="rounded-2xl border border-line p-4"><div class="text-[11px] font-bold tracking-widest text-slate-500">SCREENING RESULT</div><div id="resResult" class="text-[18px] font-extrabold text-navy leading-tight mt-2">Moderate NPDR signs detected</div><div class="text-xs text-slate-600 mt-1">Screening support finding — not a diagnosis.</div><div class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-teal"><i data-lucide="eye" class="w-3.5 h-3.5"></i> Right Eye (OD)</div></div>
+     <div class="rounded-2xl border p-4" id="riskCard"><div class="text-[11px] font-bold tracking-widest opacity-70">RISK LEVEL</div><div id="resRisk" class="mt-2 inline-flex px-3 py-1.5 rounded-full bg-amber-400 text-amber-900 text-sm font-extrabold">MEDIUM RISK</div><div id="resRiskDesc" class="text-xs mt-2 leading-relaxed">Refer to ophthalmology within 2–4 weeks.</div><div class="mt-3 w-full h-2 rounded-full bg-black/10 overflow-hidden"><div id="riskBar" class="h-full bg-amber-500" style="width:62%"></div></div></div>
+     <div class="rounded-2xl border border-line p-4 bg-white"><div class="text-[11px] font-bold tracking-widest text-slate-500">MODEL CONFIDENCE</div><div class="flex items-baseline gap-2 mt-2"><span id="resConf" class="text-3xl font-extrabold text-navy">87%</span><span class="text-xs font-semibold px-2 py-1 rounded-full bg-slate-100 border border-line">Demo</span></div><div class="text-xs text-slate-600 mt-1">Use with quality & clinical context.</div><button onclick="showPage('privacy')" class="mt-3 text-xs font-semibold text-teal underline">How confidence is shown</button></div>
+    </div>
+   </div>
+
+   <!-- Explainable AI -->
+   <div class="bg-white rounded-[24px] border border-line shadow-sm overflow-hidden">
+    <div class="px-6 py-5 border-b border-line flex flex-wrap items-center justify-between gap-3">
+     <div>
+      <h3 class="font-display font-bold text-navy text-lg flex items-center gap-2"><i data-lucide="brain" class="w-5 h-5 text-teal"></i> Explainable AI — What the model looked at</h3>
+      <p class="text-sm text-slate-600">Left: original fundus. Right: attention overlay. Red = higher influence on the “refer” signal.</p>
+     </div>
+     <div class="flex items-center gap-2 text-xs">
+      <label class="flex items-center gap-2 bg-slate-50 border border-line px-3 py-2 rounded-full"><span class="font-semibold">Overlay opacity</span><input id="opacityRange" type="range" min="30" max="90" value="65" class="accent-teal"></label>
+      <span class="hidden md:inline-flex px-3 py-2 rounded-full bg-navy text-white font-semibold">Demo attention map</span>
+     </div>
+    </div>
+    <div class="p-6 grid lg:grid-cols-2 gap-6">
+     <div>
+      <div class="text-xs font-bold tracking-widest text-slate-500 mb-2">ORIGINAL IMAGE</div>
+      <div class="rounded-2xl overflow-hidden border border-line bg-black aspect-[4/3] relative">
+       <img id="resOriginal" src="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?q=80&w=800&auto=format&fit=crop" class="w-full h-full object-cover">
+       <span class="absolute bottom-2 left-2 bg-white px-2.5 py-1 rounded-full text-xs font-semibold border">45° • Macula centred</span>
+      </div>
+      <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
+       <div class="bg-slate-50 border border-line rounded-xl px-3 py-2"><div class="text-slate-500">Sharpness</div><div class="font-semibold">8.4/10</div></div>
+       <div class="bg-slate-50 border border-line rounded-xl px-3 py-2"><div class="text-slate-500">Exposure</div><div class="font-semibold">Balanced</div></div>
+       <div class="bg-slate-50 border border-line rounded-xl px-3 py-2"><div class="text-slate-500">Artefacts</div><div class="font-semibold">Minimal</div></div>
+      </div>
+     </div>
+     <div>
+      <div class="text-xs font-bold tracking-widest text-slate-500 mb-2">AI ATTENTION MAP</div>
+      <div class="rounded-2xl overflow-hidden border border-line bg-slate-900 aspect-[4/3] relative">
+       <img src="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?q=80&w=800&auto=format&fit=crop" class="w-full h-full object-cover opacity-60" id="resHeatBase">
+       <div id="heatOverlay" class="absolute inset-0" style="opacity:.65">
+        <span class="heatmap-dot absolute rounded-full bg-red-500" style="left:31%;top:34%;width:78px;height:78px;opacity:.55"></span>
+        <span class="heatmap-dot absolute rounded-full bg-amber-400" style="left:56%;top:42%;width:56px;height:56px;opacity:.6"></span>
+        <span class="heatmap-dot absolute rounded-full bg-red-500" style="left:26%;top:62%;width:92px;height:92px;opacity:.45"></span>
+        <span class="heatmap-dot absolute rounded-full bg-amber-400" style="left:60%;top:70%;width:48px;height:48px;opacity:.65"></span>
+        <span class="heatmap-dot absolute rounded-full bg-red-400" style="left:44%;top:52%;width:36px;height:36px;opacity:.5"></span>
+       </div>
+       <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+        <span class="bg-white px-3 py-1 rounded-full text-xs font-bold border">Red = most influential</span>
+        <span class="bg-black/70 text-white px-2.5 py-1 rounded-full text-[11px] border border-white/20">Grad-CAM style • Demo</span>
+       </div>
+      </div>
+      <div class="mt-3 space-y-2 text-sm">
+       <div class="flex gap-2 p-2.5 rounded-xl bg-red-50 border border-red-200"><span class="w-2 h-2 rounded-full bg-red-500 mt-2"></span><span><span class="font-semibold">Cluster near superior arcade:</span> dense dot-blot haemorrhages & microaneurysms — strongest referral signal.</span></div>
+       <div class="flex gap-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200"><span class="w-2 h-2 rounded-full bg-amber-400 mt-2"></span><span><span class="font-semibold">Temporal exudates:</span> circinate pattern suggesting leakage; contributes to medium risk.</span></div>
+       <div class="flex gap-2 p-2.5 rounded-xl bg-slate-50 border border-line"><span class="w-2 h-2 rounded-full bg-slate-400 mt-2"></span><span><span class="font-semibold">Optic disc:</span> not a major driver for this result — model focused on mid-periphery, not disc.</span></div>
+      </div>
+     </div>
+    </div>
+    <div class="px-6 pb-6">
+     <div class="p-4 rounded-xl bg-slate-50 border border-line text-xs leading-relaxed flex gap-2"><i data-lucide="info" class="w-4 h-4 text-navy mt-0.5"></i><span><span class="font-semibold">For the health worker:</span> If referral regions look like dust or reflections, consider retaking. When in doubt, prioritise timely referral and let the ophthalmologist confirm.</span></div>
+    </div>
+   </div>
+
+   <!-- Patient-friendly + Referral -->
+   <div class="grid lg:grid-cols-2 gap-4">
+    <div class="bg-white rounded-[24px] border border-line shadow-sm p-6">
+     <div class="flex items-center justify-between gap-3">
+      <h3 class="font-display font-bold text-navy">Patient-friendly explanation</h3>
+      <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 font-semibold text-emerald-700">Plain language</span>
+     </div>
+     <div class="mt-3 flex flex-wrap items-center gap-2">
+      <label class="text-xs font-semibold">Language</label>
+      <select id="langSelect" onchange="changeLanguage()" class="rounded-full border border-line bg-white px-3 py-2 text-sm font-medium">
+       <option value="en">English</option><option value="hi">हिन्दी (Hindi)</option><option value="ta">தமிழ் (Tamil)</option><option value="te">తెలుగు (Telugu)</option><option value="bn">বাংলা (Bengali)</option><option value="mr">मराठी (Marathi)</option>
+      </select>
+      <button onclick="speakExplanation()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-navy text-white text-sm font-semibold"><i data-lucide="volume-2" class="w-4 h-4"></i> Listen</button>
+      <button onclick="stopSpeak()" class="px-3 py-2 rounded-full border border-line text-sm font-semibold">Stop</button>
+     </div>
+     <div class="mt-4 rounded-2xl border border-line overflow-hidden">
+      <div class="h-1.5 w-full bg-slate-100"><div id="langProgress" class="h-full bg-teal" style="width:62%"></div></div>
+      <div class="p-4">
+       <div id="patientExplain" class="text-[15px] leading-relaxed text-slate-800">
+        <span class="font-semibold">Namaste, Ramesh ji.</span> Your eye photo shows <span class="font-semibold">some diabetes-related changes</span> that need a doctor’s check. It is <span class="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 font-bold">not an emergency</span>, but please visit the eye hospital <span class="font-bold">within 2–4 weeks</span>. Keep taking your diabetes medicines, control sugar and blood pressure, and bring this report.
+       </div>
+       <div class="mt-3 flex items-center gap-2">
+        <div class="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden border border-line"><div class="h-full bg-amber-400" style="width:62%"></div></div><span class="text-xs font-bold">Medium priority</span>
+       </div>
+       <div class="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+        <div class="rounded-xl bg-slate-50 border border-line p-2"><div class="text-lg">👁️</div><div class="font-medium leading-tight">Changes seen — doctor to confirm</div></div>
+        <div class="rounded-xl bg-slate-50 border border-line p-2"><div class="text-lg">🗓️</div><div class="font-medium leading-tight">Visit in 2–4 weeks</div></div>
+        <div class="rounded-xl bg-slate-50 border border-line p-2"><div class="text-lg">💊</div><div class="font-medium leading-tight">Continue medicines</div></div>
+       </div>
+      </div>
+     </div>
+     <div class="mt-3 text-[11px] text-slate-500">Text-to-speech uses the device voice for the selected language. For low-literacy settings, use the visual scale above.</div>
+    </div>
+
+    <div class="bg-white rounded-[24px] border border-line shadow-sm p-6">
+     <h3 class="font-display font-bold text-navy flex items-center gap-2"><i data-lucide="clipboard-check" class="w-5 h-5 text-teal"></i> Next action & referral support</h3>
+     <p class="text-sm text-slate-600">Guidance only — no prescriptions. The health worker confirms the next step.</p>
+     <div id="referralBox" class="mt-4 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
+      <div class="flex items-center gap-2 text-sm font-extrabold text-amber-900"><i data-lucide="arrow-right-circle" class="w-4 h-4"></i> Recommended: Refer — within 2–4 weeks</div>
+      <ul class="mt-2 space-y-1.5 text-sm text-amber-900 list-disc list-inside">
+       <li>Book ophthalmology OPD; share printed report + image</li>
+       <li>Counsel on glycaemic & BP control; advise not to miss visit</li>
+       <li>If vision worsens (sudden blur, flashes), seek earlier care</li>
+      </ul>
+      <div class="mt-3 flex flex-wrap gap-2">
+       <button onclick="generateReferral()" class="px-4 py-2.5 rounded-full bg-navy text-white font-semibold text-sm">Generate referral slip</button>
+       <button onclick="showPage('history')" class="px-4 py-2.5 rounded-full bg-white border border-line font-semibold text-sm">Save to history</button>
+      </div>
+     </div>
+     <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
+      <div class="rounded-xl border border-line p-3 text-center"><div class="font-bold text-emerald-700">LOW</div><div class="text-slate-600">Routine — 6–12 months</div></div>
+      <div class="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-center"><div class="font-bold text-amber-800">MEDIUM</div><div class="text-slate-600">2–4 weeks</div></div>
+      <div class="rounded-xl border border-line p-3 text-center"><div class="font-bold text-rose-700">HIGH</div><div class="text-slate-600">Urgent — within 1 week</div></div>
+     </div>
+     <div class="mt-3 p-3 rounded-xl bg-slate-50 border border-line text-xs leading-relaxed"><span class="font-semibold">Safety:</span> If image quality is poor or patient is symptomatic (pain, sudden vision loss), refer regardless of AI output and document reason.</div>
+    </div>
+   </div>
+
+   <div class="bg-slate-900 text-white rounded-[24px] p-5 flex flex-wrap items-center justify-between gap-3">
+    <div class="text-sm"><span class="font-bold">Need to show the jury the full loop?</span> <span class="opacity-80">Use Presentation Mode to auto-walk through Screen → Explain → Prioritise → Refer.</span></div>
+    <button onclick="startPresentation()" class="px-5 py-2.5 rounded-full bg-teal font-semibold">Start Presentation Mode</button>
+   </div>
+  </div>
+ </section>
+
+ <!-- HISTORY -->
+ <section id="page-history" class="page hidden">
+  <div class="mt-6 bg-white rounded-[24px] border border-line shadow-sm overflow-hidden">
+   <div class="px-6 py-5 border-b border-line flex flex-wrap items-center justify-between gap-3">
+    <div>
+     <h2 class="font-display font-bold text-navy text-xl">Patient history & timeline</h2>
+     <p class="text-sm text-slate-600">Local-first records. Search by name, ID or village. Demo data is labelled.</p>
+    </div>
+    <div class="flex items-center gap-2">
+     <div class="relative"><i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i><input id="historySearch" oninput="renderHistory()" placeholder="Search patients..." class="pl-9 pr-4 py-2.5 rounded-full border border-line bg-slate-50 text-sm w-[220px]"></div>
+     <select id="historyFilter" onchange="renderHistory()" class="rounded-full border border-line px-3 py-2.5 text-sm bg-white"><option value="all">All risks</option><option value="Low">Low</option><option value="Medium">Medium</option><option value="High">High</option></select>
+    </div>
+   </div>
+   <div class="overflow-auto">
+    <table class="w-full text-sm">
+     <thead class="bg-slate-50 text-xs tracking-widest font-bold text-slate-500"><tr><th class="text-left px-6 py-3">Patient</th><th class="text-left px-3 py-3">Screening Date</th><th class="text-left px-3 py-3">Result</th><th class="text-left px-3 py-3">Risk</th><th class="text-left px-3 py-3">Quality</th><th class="text-left px-6 py-3">Action</th></tr></thead>
+     <tbody id="historyBody" class="divide-y divide-slate-100"></tbody>
+    </table>
+   </div>
+   <div class="px-6 py-4 bg-slate-50 border-t border-line flex items-center justify-between text-xs">
+    <span class="text-slate-600"><span id="historyCount">0</span> records • Stored locally on this device</span>
+    <button onclick="clearHistory()" class="px-3 py-1.5 rounded-full border border-line bg-white font-semibold">Clear demo data</button>
+   </div>
+  </div>
+
+  <div class="mt-4 bg-white rounded-[24px] border border-line p-6">
+   <h3 class="font-bold text-navy">Timeline view</h3>
+   <div id="timeline" class="mt-4 relative pl-6 border-l-2 border-slate-200 space-y-4"></div>
+  </div>
+ </section>
+
+ <!-- DASHBOARD -->
+ <section id="page-dashboard" class="page hidden">
+  <div class="mt-6 grid md:grid-cols-4 gap-4">
+   <div class="bg-white rounded-2xl border border-line p-5"><div class="text-xs font-bold tracking-widest text-slate-500">TOTAL SCREENINGS</div><div id="mTotal" class="text-3xl font-extrabold text-navy mt-1">0</div><div class="text-xs text-slate-600">This device • demo inclusive</div></div>
+   <div class="bg-white rounded-2xl border border-line p-5"><div class="text-xs font-bold tracking-widest text-slate-500">REFERRED</div><div id="mReferred" class="text-3xl font-extrabold text-amber-600 mt-1">0</div><div class="text-xs text-slate-600">Medium + High risk</div></div>
+   <div class="bg-white rounded-2xl border border-line p-5"><div class="text-xs font-bold tracking-widest text-slate-500">HIGH RISK</div><div id="mHigh" class="text-3xl font-extrabold text-rose-700 mt-1">0</div><div class="text-xs text-slate-600">Needs urgent follow-up</div></div>
+   <div class="bg-navy text-white rounded-2xl p-5"><div class="text-xs font-bold tracking-widest opacity-70">RURAL MODE QUEUE</div><div id="mQueue" class="text-3xl font-extrabold mt-1">0 pending</div><div class="text-xs opacity-70">Sync when online</div></div>
+  </div>
+
+  <div class="mt-4 grid lg:grid-cols-[1.2fr_0.8fr] gap-4">
+   <div class="bg-white rounded-[24px] border border-line overflow-hidden">
+    <div class="px-6 py-4 border-b border-line flex items-center justify-between"><h3 class="font-bold text-navy">Patients by risk</h3><span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 border border-line">Last 30 days (demo)</span></div>
+    <div class="p-6">
+     <div class="space-y-3" id="riskBars"></div>
+     <div class="mt-6 overflow-auto">
+      <table class="w-full text-sm"><thead class="text-xs font-bold tracking-widest text-slate-500"><tr><th class="text-left py-2">Patient</th><th class="text-left">Risk</th><th class="text-left">Next action</th><th class="text-left">Status</th></tr></thead><tbody id="dashBody" class="divide-y"></tbody></table>
+     </div>
+    </div>
+   </div>
+   <div class="space-y-4">
+    <div class="bg-white rounded-[24px] border border-line p-6">
+     <h3 class="font-bold text-navy">Screening metrics</h3>
+     <div class="mt-4 space-y-3 text-sm">
+      <div class="flex justify-between"><span class="text-slate-600">Avg. image quality</span><span class="font-semibold">Good (7.9/10)</span></div>
+      <div class="flex justify-between"><span class="text-slate-600">Retake rate</span><span class="font-semibold">12%</span></div>
+      <div class="flex justify-between"><span class="text-slate-600">Avg. time per screening</span><span class="font-semibold">3.2 min</span></div>
+     </div>
+     <div class="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs leading-relaxed"><span class="font-bold text-emerald-800">For PHC in-charge:</span> Use this to plan camp follow-ups. High-risk patients are auto-surfaced at top of History.</div>
+    </div>
+    <div class="rounded-[24px] bg-teal text-white p-6">
+     <h3 class="font-bold">Prototype Offline Mode</h3>
+     <p class="text-sm opacity-90 mt-1 leading-relaxed">When Rural Mode is ON, new screenings are marked “Pending Sync” and stored in browser storage. Ideal for camps with intermittent connectivity.</p>
+     <button onclick="toggleRural()" class="mt-3 px-4 py-2 rounded-full bg-white text-teal font-semibold text-sm">Toggle Rural Mode</button>
+    </div>
+   </div>
+  </div>
+ </section>
+
+ <!-- PRIVACY & TECH -->
+ <section id="page-privacy" class="page hidden">
+  <div class="mt-6 grid lg:grid-cols-[1.15fr_0.85fr] gap-6">
+   <div class="space-y-4">
+    <div class="bg-white rounded-[24px] border border-line p-6">
+     <h2 class="font-display font-bold text-navy text-xl flex items-center gap-2"><i data-lucide="shield-check" class="w-5 h-5 text-teal"></i> Privacy & Safety</h2>
+     <div class="mt-4 space-y-3">
+      <details open class="rounded-xl border border-line bg-slate-50 p-4"><summary class="font-semibold cursor-pointer">Data protection</summary><p class="text-sm text-slate-600 mt-2 leading-relaxed">Images and patient details are stored locally in the browser (localStorage) for this prototype. No cloud upload occurs in demo mode. In production, data would be encrypted in transit (TLS) and at rest, with role-based access and audit logs.</p></details>
+      <details class="rounded-xl border border-line p-4"><summary class="font-semibold cursor-pointer">Not a diagnostic device</summary><p class="text-sm text-slate-600 mt-2 leading-relaxed">VisionCare AI is a <span class="font-semibold">screening and decision-support tool</span>. It does not provide a final diagnosis or prescribe treatment. All referral decisions must be confirmed by a qualified ophthalmologist.</p></details>
+      <details class="rounded-xl border border-line p-4"><summary class="font-semibold cursor-pointer">Consent & de-identification</summary><p class="text-sm text-slate-600 mt-2 leading-relaxed">Health workers must obtain verbal/written consent before capture. EXIF is stripped before analysis. Patient IDs are pseudonymised (VC-YYYY-XXXX) and reports can be printed without phone numbers.</p></details>
+      <details class="rounded-xl border border-line p-4"><summary class="font-semibold cursor-pointer">Limitations</summary><p class="text-sm text-slate-600 mt-2 leading-relaxed">Performance depends on image quality and may be lower for media opacities, small pupils, or other pathologies. The model is demonstrated on simulated data; clinical validation and regulatory approval would be required before deployment.</p></details>
+     </div>
+    </div>
+    <div class="bg-white rounded-[24px] border border-line p-6">
+     <h3 class="font-bold text-navy flex items-center gap-2"><i data-lucide="workflow" class="w-5 h-5"></i> Technical Architecture (API-ready, modular)</h3>
+     <div class="mt-4 grid grid-cols-3 gap-3 text-xs font-semibold text-center">
+      <div class="rounded-xl bg-navy text-white p-3">Capture App<br><span class="opacity-70 font-normal">PWA • Camera • Offline queue</span></div>
+      <div class="rounded-xl bg-slate-100 border border-line p-3">API Gateway<br><span class="text-slate-600 font-normal">Auth • De-ID • Audit</span></div>
+      <div class="rounded-xl bg-teal text-white p-3">AI Service<br><span class="opacity-90 font-normal">Quality + DR model • Explain</span></div>
+     </div>
+     <div class="mt-3 grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center text-[11px] font-mono text-center text-slate-600">
+      <span>POST /v1/screen</span><span>→</span><span>GET /v1/explain/{id}</span><span>→</span><span>FHIR Referral</span>
+     </div>
+     <div class="mt-4 p-3 rounded-xl bg-slate-50 border border-line text-xs leading-relaxed"><span class="font-semibold">Future integration:</span> Swap the demo simulator with a real model endpoint by replacing <span class="font-mono">simulateAnalysis()</span> with <span class="font-mono">fetch('/api/analyse', {image})</span>. The UI already expects quality, heatmap, risk and confidence fields.</div>
+    </div>
+   </div>
+
+   <div class="space-y-4">
+    <div class="bg-white rounded-[24px] border border-line p-6">
+     <h3 class="font-bold text-navy">Hackathon presentation checklist</h3>
+     <ul class="mt-3 space-y-2 text-sm">
+      <li class="flex gap-2"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 mt-0.5"></i> End-to-end flow in under 90 seconds via Presentation Mode</li>
+      <li class="flex gap-2"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 mt-0.5"></i> Explainability is visual — not just a score</li>
+      <li class="flex gap-2"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 mt-0.5"></i> Rural & accessibility considerations built-in</li>
+      <li class="flex gap-2"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 mt-0.5"></i> Safety & privacy stated on every key screen</li>
+     </ul>
+     <button onclick="startPresentation()" class="mt-4 w-full py-3 rounded-full bg-navy text-white font-semibold">Run Presentation Mode</button>
+    </div>
+    <div class="rounded-[24px] bg-amber-50 border border-amber-200 p-6">
+     <h3 class="font-bold text-amber-900">Demo data notice</h3>
+     <p class="text-sm text-amber-800 leading-relaxed mt-1">All patient names, images and predictions are fictional and for demonstration only. Retinal image is a placeholder fundus photo. Risk levels are simulated to showcase triage.</p>
+    </div>
+    <div class="bg-white rounded-[24px] border border-line p-6">
+     <h3 class="font-bold text-navy">Status indicators</h3>
+     <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+      <span class="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">● Online</span>
+      <span class="px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800">● Prototype Offline Mode</span>
+      <span class="px-3 py-1.5 rounded-full bg-slate-900 text-white">● Demo Model v0.9</span>
+     </div>
+     <p class="text-xs text-slate-600 mt-3 leading-relaxed">Navigation is sticky, contrast meets WCAG AA, buttons are large for gloved use, and all actions have a visible keyboard focus ring.</p>
+    </div>
+   </div>
+  </div>
+ </section>
+</main>
+
+<footer class="mt-6 border-t border-line bg-white">
+ <div class="max-w-[1280px] mx-auto px-4 md:px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+  <div>© 2024 VisionCare AI — Hackathon prototype. For demonstration only. Not for clinical use.</div>
+  <div class="flex items-center gap-2"><span class="px-2.5 py-1 rounded-full bg-slate-900 text-white font-mono">Build: demo-1.0</span><span class="hidden sm:inline">Screen • Explain • Prioritise • Refer</span></div>
+ </div>
+</footer>
+
+<!-- Referral Modal -->
+<div id="referralModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm p-4 flex items-center justify-center">
+ <div class="bg-white rounded-[20px] max-w-[640px] w-full overflow-hidden border border-line shadow-xl">
+  <div class="px-6 py-4 border-b border-line flex items-center justify-between"><h3 class="font-bold text-navy">Referral Slip — Preview</h3><button onclick="closeReferral()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button></div>
+  <div id="referralContent" class="p-6 text-sm leading-relaxed"></div>
+  <div class="px-6 py-4 bg-slate-50 border-t border-line flex justify-end gap-2"><button onclick="closeReferral()" class="px-4 py-2 rounded-full border border-line font-semibold bg-white">Close</button><button onclick="window.print()" class="px-4 py-2 rounded-full bg-navy text-white font-semibold">Print</button></div>
+ </div>
+</div>
+
+<div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-3 rounded-full text-sm font-medium shadow-lg hidden z-50 flex items-center gap-2"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i><span id="toastMsg">Saved</span></div>
+
+<script>
+ lucide.createIcons();
+
+ const demoPatients = [
+  {id:"VC-2024-1842", name:"Ramesh Kumar", age:58, gender:"Male", phone:"98XXXXXX42", village:"Nalgonda, Telangana", diabetes:"8 years", lastScreen:"Never", date:"18 Nov 2024, 10:12 AM", result:"Moderate NPDR signs detected", risk:"Medium", quality:"Good", confidence:"87%", image:"https://images.unsplash.com/photo-1559757148-5c350d0d3c56?q=80&w=400&auto=format&fit=crop"},
+  {id:"VC-2024-1839", name:"Lakshmi Devi", age:62, gender:"Female", phone:"98XXXXXX39", village:"Warangal, Telangana", diabetes:"> 10 years", lastScreen:"> 1 year ago", date:"17 Nov 2024, 09:40 AM", result:"No DR signs detected", risk:"Low", quality:"Good", confidence:"92%", image:"https://images.unsplash.com/photo-1576091160550-2173dba999ef?q=80&w=400&auto=format&fit=crop"},
+  {id:"VC-2024-1835", name:"Suresh Patel", age:49, gender:"Male", phone:"98XXXXXX35", village:"Karimnagar, Telangana", diabetes:"5–10 years", lastScreen:"6–12 months ago", date:"16 Nov 2024, 03:15 PM", result:"Severe NPDR / PDR signs — urgent", risk:"High", quality:"Adequate", confidence:"81%", image:"https://images.unsplash.com/photo-1559757175-5700dde675bc?q=80&w=400&auto=format&fit=crop"},
+  {id:"VC-2024-1828", name:"Anita Sharma", age:45, gender:"Female", phone:"98XXXXXX28", village:"Khammam, Telangana", diabetes:"2–5 years", lastScreen:"Never", date:"15 Nov 2024, 11:05 AM", result:"Mild NPDR signs detected", risk:"Low", quality:"Good", confidence:"76%", image:"https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=400&auto=format&fit=crop"},
+  {id:"VC-2024-1821", name:"Mohammed Ali", age:55, gender:"Male", phone:"98XXXXXX21", village:"Adilabad, Telangana", diabetes:"8 years", lastScreen:"Never", date:"14 Nov 2024, 02:30 PM", result:"Moderate NPDR signs detected", risk:"Medium", quality:"Poor — glare", confidence:"64%", image:"https://images.unsplash.com/photo-1559757148-5c350d0d3c56?q=80&w=400&auto=format&fit=crop"},
+ ];
+
+ let patients = [];
+ let currentPatient = null;
+ let currentResult = null;
+ let ruralMode = false;
+ let pendingQueue = 0;
+
+ function loadPatients(){
+  const saved = localStorage.getItem('vc_patients');
+  if(saved){ patients = JSON.parse(saved); } else { patients = [...demoPatients]; savePatients(); }
+ }
+ function savePatients(){ localStorage.setItem('vc_patients', JSON.stringify(patients)); }
+
+ function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
+  const el = document.getElementById('page-'+id);
+  if(el) el.classList.remove('hidden');
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+   b.classList.remove('bg-navy','text-white');
+   b.classList.add('hover:bg-slate-100');
+   if(b.dataset.nav===id){ b.classList.add('bg-navy','text-white'); b.classList.remove('hover:bg-slate-100'); }
+  });
+  window.scrollTo({top:0, behavior:'smooth'});
+  if(id==='history') renderHistory();
+  if(id==='dashboard') renderDashboard();
+  if(id==='screening') updateContextCard();
+  lucide.createIcons();
+ }
+ function toggleMobile(){ document.getElementById('mobileNav').classList.toggle('hidden'); }
+
+ function toggleRural(){
+  ruralMode = !ruralMode;
+  const knob = document.getElementById('ruralKnob');
+  const toggle = document.getElementById('ruralToggle');
+  if(ruralMode){ toggle.classList.add('bg-teal'); toggle.classList.remove('bg-slate-200'); knob.style.transform='translateX(18px)'; document.getElementById('offlineBadge').textContent='Prototype Offline Mode — local save'; document.getElementById('offlineBadge').className='px-2.5 py-1 rounded-full bg-amber-400 text-amber-900 font-bold'; showToast('Rural Mode ON — data will be saved locally'); }
+  else { toggle.classList.remove('bg-teal'); toggle.classList.add('bg-slate-200'); knob.style.transform='translateX(0)'; document.getElementById('offlineBadge').textContent='Online — sync enabled'; document.getElementById('offlineBadge').className='px-2.5 py-1 rounded-full bg-white/10 border border-white/15'; showToast('Rural Mode OFF — online sync enabled'); }
+  document.getElementById('mQueue') && (document.getElementById('mQueue').textContent = ruralMode ? (pendingQueue+' pending') : '0 pending');
+  document.getElementById('queueCount').textContent = pendingQueue;
+ }
+
+ function fillDemoPatient(){
+  const f = document.getElementById('registerForm');
+  f.name.value='Sunita Reddy'; f.age.value=52; f.gender.value='Female'; f.phone.value='98XXXXXX77'; f.village.value='Nalgonda, Telangana'; f.diabetes.value='5–10 years'; f.lastScreen.value='Never';
+  showToast('Demo data filled — review consent and continue');
+ }
+
+ document.getElementById('registerForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const pid = 'VC-2024-'+Math.floor(1000+Math.random()*9000);
+  currentPatient = {
+   id: pid,
+   name: fd.get('name'),
+   age: fd.get('age'),
+   gender: fd.get('gender'),
+   phone: fd.get('phone')||'—',
+   village: fd.get('village')||'—',
+   diabetes: fd.get('diabetes'),
+   lastScreen: fd.get('lastScreen'),
+   htn: fd.get('htn'),
+   date: new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+', '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),
+  };
+  showToast('Patient registered — '+pid);
+  updateContextCard();
+  showPage('screening');
+ });
+
+ function updateContextCard(){
+  if(!currentPatient) return;
+  document.getElementById('chipName').textContent = currentPatient.name+' • '+currentPatient.age+(currentPatient.gender==='Male'?'M':currentPatient.gender==='Female'?'F':'');
+  document.getElementById('chipId').textContent = currentPatient.id;
+  document.getElementById('patientChip').classList.remove('hidden');
+  document.getElementById('ctxName').textContent = currentPatient.name+' • '+currentPatient.age+'y • '+currentPatient.gender;
+  document.getElementById('ctxMeta').textContent = currentPatient.village+' • ID '+currentPatient.id;
+  document.getElementById('ctxDiabetes').textContent = currentPatient.diabetes;
+  document.getElementById('ctxLast').textContent = currentPatient.lastScreen;
+ }
+
+ // Image handling
+ const dropZone = document.getElementById('dropZone');
+ const fileInput = document.getElementById('fileInput');
+ let selectedDataUrl = null;
+
+ ['dragenter','dragover'].forEach(ev=> dropZone.addEventListener(ev,e=>{e.preventDefault(); dropZone.classList.add('border-teal','bg-teal/5');}));
+ ['dragleave','drop'].forEach(ev=> dropZone.addEventListener(ev,e=>{e.preventDefault(); dropZone.classList.remove('border-teal','bg-teal/5');}));
+ dropZone.addEventListener('drop', e=>{
+  const f = e.dataTransfer.files[0];
+  if(f) handleFile(f);
+ });
+ fileInput.addEventListener('change', e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); });
+
+ function handleFile(file){
+  if(!file.type.startsWith('image/')){ showToast('Please upload JPG/PNG image'); return; }
+  if(file.size>8*1024*1024){ showToast('File too large — max 8 MB'); return; }
+  const reader = new FileReader();
+  reader.onload = e=>{
+   selectedDataUrl = e.target.result;
+   showPreview(file.name, file.size, selectedDataUrl);
+  };
+  reader.readAsDataURL(file);
+ }
+
+ function showPreview(name,size,dataUrl){
+  document.getElementById('dropEmpty').classList.add('hidden');
+  document.getElementById('dropPreview').classList.remove('hidden');
+  document.getElementById('previewImg').src = dataUrl;
+  document.getElementById('analysisImg').src = dataUrl;
+  document.getElementById('resOriginal').src = dataUrl;
+  document.getElementById('resHeatBase').src = dataUrl;
+  document.getElementById('fileMeta').textContent = name+' • '+(size/1024).toFixed(0)+' KB • Ready';
+  // quality simulation
+  const qualities = [
+   {label:'Focus', value:'Sharp (8.4/10)', pass:true},
+   {label:'Illumination', value:'Even', pass:true},
+   {label:'Field coverage', value:'Macula centred', pass:true},
+  ];
+  const isPoor = Math.random()<0.18;
+  if(isPoor){ qualities[0].value='Slight blur (6.1/10)'; qualities[0].pass=false; }
+  const html = qualities.map(q=>`
+   <div class="flex items-center justify-between p-3 rounded-xl border ${q.pass?'bg-emerald-50 border-emerald-200':'bg-amber-50 border-amber-200'}">
+    <div class="text-sm"><div class="font-semibold ${q.pass?'text-emerald-800':'text-amber-800'}">${q.label}</div><div class="text-xs ${q.pass?'text-emerald-700':'text-amber-700'}">${q.value}</div></div>
+    <span class="w-7 h-7 rounded-full flex items-center justify-center ${q.pass?'bg-emerald-600 text-white':'bg-amber-500 text-white'}">${q.pass?'✓':'!'}</span>
+   </div>
+  `).join('');
+  document.getElementById('qualityList').innerHTML = html;
+  document.getElementById('retakeHint').classList.toggle('hidden', !isPoor);
+  document.getElementById('analyseBtn').disabled=false;
+  lucide.createIcons();
+ }
+
+ function clearImage(){
+  selectedDataUrl=null;
+  document.getElementById('dropEmpty').classList.remove('hidden');
+  document.getElementById('dropPreview').classList.add('hidden');
+  document.getElementById('fileMeta').textContent='No file selected';
+  document.getElementById('analyseBtn').disabled=true;
+  fileInput.value='';
+ }
+
+ function useSampleImage(){
+  const url='https://images.unsplash.com/photo-1559757148-5c350d0d3c56?q=80&w=800&auto=format&fit=crop';
+  fetch(url).then(r=>r.blob()).then(b=>{
+   const file = new File([b],'sample-fundus.jpg',{type:'image/jpeg'});
+   handleFile(file);
+  }).catch(()=>{
+   selectedDataUrl=url;
+   showPreview('sample-fundus.jpg', 342000, url);
+  });
+ }
+
+ function openCamera(){
+  // fallback to file input with capture
+  const inp = document.createElement('input');
+  inp.type='file'; inp.accept='image/*'; inp.capture='environment';
+  inp.onchange=e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); };
+  inp.click();
+ }
+
+ function startAnalysis(){
+  if(!currentPatient){ showToast('Please register patient first'); showPage('register'); return; }
+  if(!selectedDataUrl){ showToast('Please upload an image'); return; }
+  showPage('analysis');
+  runAnalysisSequence();
+ }
+
+ let analysisTimer=null;
+ function runAnalysisSequence(){
+  let pct=6;
+  document.getElementById('progressBar').style.width='6%';
+  document.getElementById('analysisPct').textContent='6% • Validating';
+  const steps = document.querySelectorAll('#stepList [data-step]');
+  steps.forEach((s,i)=>{ s.style.opacity = i===0?'1':'0.4'; s.querySelector('div').className = i===0?'w-8 h-8 rounded-full bg-teal text-white flex items-center justify-center shrink-0':'w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0 text-slate-600'; });
+  const stepTexts=['Validating','Quality check','Analysing patterns','Stratifying risk'];
+  let step=0;
+  clearInterval(analysisTimer);
+  analysisTimer=setInterval(()=>{
+   pct+= Math.random()*14+6;
+   if(pct>=100){ pct=100; clearInterval(analysisTimer); finishAnalysis(); }
+   document.getElementById('progressBar').style.width=pct+'%';
+   const sIdx = pct<28?0:pct<58?1:pct<88?2:3;
+   if(sIdx!==step){
+    step=sIdx;
+    steps.forEach((el,i)=>{
+     if(i<step){ el.style.opacity='1'; el.querySelector('div').innerHTML='<i data-lucide="check" class="w-4 h-4"></i>'; el.querySelector('div').className='w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0'; }
+     else if(i===step){ el.style.opacity='1'; el.querySelector('div').innerHTML='<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>'; el.querySelector('div').className='w-8 h-8 rounded-full bg-teal text-white flex items-center justify-center shrink-0'; }
+     else{ el.style.opacity='0.4'; }
+    });
+    lucide.createIcons();
+   }
+   document.getElementById('analysisPct').textContent=Math.round(pct)+'% • '+stepTexts[step];
+  },420);
+ }
+
+ function skipAnalysis(){ clearInterval(analysisTimer); finishAnalysis(); }
+
+ function finishAnalysis(){
+  // generate simulated result
+  const risks=['Low','Medium','High'];
+  const weights=[0.42,0.38,0.20];
+  let r=Math.random(), accum=0, chosen='Low';
+  for(let i=0;i<weights.length;i++){ accum+=weights[i]; if(r<accum){ chosen=risks[i]; break; } }
+  // if image was poor, bias to low confidence
+  const isPoor = document.getElementById('retakeHint') && !document.getElementById('retakeHint').classList.contains('hidden');
+  const conf = isPoor ? 62+Math.floor(Math.random()*12) : 74+Math.floor(Math.random()*18);
+  const map={
+   Low:{result:'No DR signs / Mild NPDR signs', desc:'Routine screening — repeat in 6–12 months', color:'emerald', bar:24, referral:'Routine — no urgent referral'},
+   Medium:{result:'Moderate NPDR signs detected', desc:'Refer to ophthalmology within 2–4 weeks', color:'amber', bar:62, referral:'Refer — within 2–4 weeks'},
+   High:{result:'Severe NPDR / PDR signs — urgent', desc:'Urgent referral — within 1 week', color:'rose', bar:88, referral:'Urgent referral — within 1 week'}
+  };
+  currentResult={risk:chosen, confidence:conf+'%', quality: isPoor?'Adequate — slight blur':'Good — Usable', ...map[chosen]};
+  // persist
+  const record={
+   id: currentPatient.id,
+   name: currentPatient.name,
+   age: currentPatient.age,
+   gender: currentPatient.gender,
+   village: currentPatient.village,
+   diabetes: currentPatient.diabetes,
+   lastScreen: currentPatient.lastScreen,
+   date: new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+', '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),
+   result: currentResult.result,
+   risk: currentResult.risk,
+   quality: currentResult.quality,
+   confidence: currentResult.confidence,
+   image: selectedDataUrl
+  };
+  patients.unshift(record);
+  savePatients();
+  if(ruralMode){ pendingQueue++; document.getElementById('queueCount').textContent=pendingQueue; }
+  populateResults();
+  showPage('results');
+ }
+
+ function populateResults(){
+  if(!currentPatient || !currentResult) return;
+  document.getElementById('resId').textContent=currentPatient.id;
+  document.getElementById('resDate').textContent=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+' • '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('resQuality').textContent=currentResult.quality;
+  document.getElementById('resResult').textContent=currentResult.result;
+  document.getElementById('resConf').textContent=currentResult.confidence;
+  const riskEl=document.getElementById('resRisk');
+  const riskCard=document.getElementById('riskCard');
+  const riskBar=document.getElementById('riskBar');
+  const riskDesc=document.getElementById('resRiskDesc');
+  const referralBox=document.getElementById('referralBox');
+  if(currentResult.risk==='Low'){
+   riskEl.textContent='LOW RISK'; riskEl.className='mt-2 inline-flex px-3 py-1.5 rounded-full bg-emerald-500 text-white text-sm font-extrabold';
+   riskCard.className='rounded-2xl border p-4 bg-emerald-50 border-emerald-200';
+   riskBar.className='h-full bg-emerald-500'; riskBar.style.width='24%';
+   riskDesc.textContent='Routine screening — repeat in 6–12 months. Counsel on diabetes control.';
+   referralBox.className='mt-4 rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4';
+   referralBox.innerHTML=`<div class="flex items-center gap-2 text-sm font-extrabold text-emerald-900"><i data-lucide="check-circle-2" class="w-4 h-4"></i> Recommended: Routine — no urgent referral</div><ul class="mt-2 space-y-1.5 text-sm text-emerald-900 list-disc list-inside"><li>Continue regular diabetes follow-up</li><li>Repeat eye screening in 6–12 months</li><li>Advise on sugar, BP, and smoking cessation</li></ul><div class="mt-3 flex flex-wrap gap-2"><button onclick="generateReferral()" class="px-4 py-2.5 rounded-full bg-navy text-white font-semibold text-sm">Generate report</button><button onclick="showPage('history')" class="px-4 py-2.5 rounded-full bg-white border border-line font-semibold text-sm">Save to history</button></div>`;
+  } else if(currentResult.risk==='Medium'){
+   riskEl.textContent='MEDIUM RISK'; riskEl.className='mt-2 inline-flex px-3 py-1.5 rounded-full bg-amber-400 text-amber-900 text-sm font-extrabold';
+   riskCard.className='rounded-2xl border p-4 bg-amber-50 border-amber-300';
+   riskBar.className='h-full bg-amber-500'; riskBar.style.width='62%';
+   riskDesc.textContent='Refer to ophthalmology within 2–4 weeks.';
+   referralBox.className='mt-4 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4';
+   referralBox.innerHTML=`<div class="flex items-center gap-2 text-sm font-extrabold text-amber-900"><i data-lucide="arrow-right-circle" class="w-4 h-4"></i> Recommended: Refer — within 2–4 weeks</div><ul class="mt-2 space-y-1.5 text-sm text-amber-900 list-disc list-inside"><li>Book ophthalmology OPD; share printed report + image</li><li>Counsel on glycaemic & BP control; advise not to miss visit</li><li>If vision worsens, seek earlier care</li></ul><div class="mt-3 flex flex-wrap gap-2"><button onclick="generateReferral()" class="px-4 py-2.5 rounded-full bg-navy text-white font-semibold text-sm">Generate referral slip</button><button onclick="showPage('history')" class="px-4 py-2.5 rounded-full bg-white border border-line font-semibold text-sm">Save to history</button></div>`;
+  } else {
+   riskEl.textContent='HIGH RISK'; riskEl.className='mt-2 inline-flex px-3 py-1.5 rounded-full bg-rose-600 text-white text-sm font-extrabold';
+   riskCard.className='rounded-2xl border p-4 bg-rose-50 border-rose-300';
+   riskBar.className='h-full bg-rose-600'; riskBar.style.width='88%';
+   riskDesc.textContent='Urgent referral — within 1 week. Possible proliferative changes.';
+   referralBox.className='mt-4 rounded-2xl border-2 border-rose-300 bg-rose-50 p-4';
+   referralBox.innerHTML=`<div class="flex items-center gap-2 text-sm font-extrabold text-rose-900"><i data-lucide="alert-triangle" class="w-4 h-4"></i> Recommended: Urgent referral — within 1 week</div><ul class="mt-2 space-y-1.5 text-sm text-rose-900 list-disc list-inside"><li>Escalate to ophthalmologist urgently; do not delay</li><li>Provide referral slip, image and risk summary</li><li>Advise patient to bring attendant and previous records</li></ul><div class="mt-3 flex flex-wrap gap-2"><button onclick="generateReferral()" class="px-4 py-2.5 rounded-full bg-rose-700 text-white font-semibold text-sm">Generate urgent slip</button><button onclick="showPage('history')" class="px-4 py-2.5 rounded-full bg-white border border-line font-semibold text-sm">Save to history</button></div>`;
+  }
+  // update patient explanation language current
+  changeLanguage();
+  lucide.createIcons();
+ }
+
+ // Language & TTS
+ const translations={
+  en:`<span class="font-semibold">Namaste, {name} ji.</span> Your eye photo shows <span class="font-semibold">{finding}</span> that needs a doctor’s check. It is <span class="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 font-bold">{urgency}</span>, but please visit the eye hospital <span class="font-bold">{when}</span>. Keep taking your diabetes medicines, control sugar and blood pressure, and bring this report.`,
+  hi:`<span class="font-semibold">नमस्ते, {name} जी।</span> आपकी आँख की फोटो में <span class="font-semibold">{finding_hi}</span> दिख रहे हैं, इसलिए डॉक्टर से जाँच जरूरी है। यह <span class="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 font-bold">{urgency_hi}</span> है, कृपया <span class="font-bold">{when_hi}</span> आँख के अस्पताल जाएँ। दवाइयाँ जारी रखें और यह रिपोर्ट साथ लाएँ।`,
+  ta:`<span class="font-semibold">வணக்கம், {name}.</span> உங்கள் கண் படத்தில் <span class="font-semibold">{finding_ta}</span> தென்படுகிறது, எனவே மருத்துவரை சந்திக்கவும். இது <span class="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 font-bold">{urgency_ta}</span>, தயவுசெய்து <span class="font-bold">{when_ta}</span> கண் மருத்துவமனைக்கு செல்லவும்.`,
+  te:`<span class="font-semibold">నమస్తే, {name} గారు.</span> మీ కంటి ఫోటోలో <span class="font-semibold">{finding_te}</span> కనిపిస్తున్నాయి, డాక్టర్ పరీక్ష అవసరం. ఇది <span class="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 font-bold">{urgency_te}</span>, దయచేసి <span class="font-bold">{when_te}</span> కంటి ఆసుపత్రికి వెళ్ళండి.`,
+  bn:`<span class="font-semibold">নমস্কার, {name}।</span> আপনার চোখের ছবিতে <span class="font-semibold">{finding_bn}</span> দেখা যাচ্ছে, ডাক্তারের পরামর্শ নিন। এটি <span class="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 font-bold">{urgency_bn}</span>, অনুগ্রহ করে <span class="font-bold">{when_bn}</span> চক্ষু হাসপাতালে যান।`,
+  mr:`<span class="font-semibold">नमस्ते, {name}.</span> आपल्या डोळ्याच्या फोटोमध्ये <span class="font-semibold">{finding_mr}</span> दिसत आहेत, डॉक्टर तपासणी आवश्यक आहे. हे <span class="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 font-bold">{urgency_mr}</span> आहे, कृपया <span class="font-bold">{when_mr}</span> डोळ्यांच्या रुग्णालयात जा.`
+ };
+ function changeLanguage(){
+  const lang=document.getElementById('langSelect').value;
+  const name = currentPatient? currentPatient.name.split(' ')[0] : 'Ramesh';
+  const risk = currentResult? currentResult.risk : 'Medium';
+  const mapRisk={
+   Low:{finding:'no major changes / mild changes', urgency:'not an emergency', when:'in the next 6–12 months', finding_hi:'हल्के बदलाव', urgency_hi:'आपात स्थिति नहीं', when_hi:'6–12 महीनों में', finding_ta:'லேசான மாற்றங்கள்', urgency_ta:'அவசரமில்லை', when_ta:'6–12 மாதங்களில்', finding_te:'స్వల్ప మార్పులు', urgency_te:'అత్యవసరం కాదు', when_te:'6–12 నెలల్లో', finding_bn:'হালকা পরিবর্তন', urgency_bn:'জরুরি নয়', when_bn:'6–12 মাসের মধ্যে', finding_mr:'सौम्य बदल', urgency_mr:'तातडी नाही', when_mr:'6–12 महिन्यांत'},
+   Medium:{finding:'some diabetes-related changes', urgency:'not an emergency', when:'within 2–4 weeks', finding_hi:'मधुमेह से जुड़े कुछ बदलाव', urgency_hi:'आपात स्थिति नहीं', when_hi:'2–4 हफ्तों में', finding_ta:'நீரிழிவு தொடர்பான சில மாற்றங்கள்', urgency_ta:'அவசரமில்லை', when_ta:'2–4 வாரங்களில்', finding_te:'మధుమేహ సంబంధిత మార్పులు', urgency_te:'అత్యవసరం కాదు', when_te:'2–4 వారాల్లో', finding_bn:'ডায়াবেটিস-জনিত কিছু পরিবর্তন', urgency_bn:'জরুরি নয়', when_bn:'2–4 সপ্তাহের মধ্যে', finding_mr:'मधुमेहाशी संबंधित बदल', urgency_mr:'तातडी नाही', when_mr:'2–4 आठवड्यांत'},
+   High:{finding:'significant changes that need urgent attention', urgency:'needs urgent attention', when:'within 1 week', finding_hi:'महत्वपूर्ण बदलाव — तुरंत ध्यान दें', urgency_hi:'तुरंत ध्यान आवश्यक', when_hi:'1 हफ्ते के भीतर', finding_ta:'குறிப்பிடத்தக்க மாற்றங்கள் — அவசர கவனம் தேவை', urgency_ta:'அவசர கவனம் தேவை', when_ta:'1 வாரத்திற்குள்', finding_te:'గమనించదగ్గ మార్పులు — తక్షణ శ్రద్ధ అవసరం', urgency_te:'తక్షణ శ్రద్ధ అవసరం', when_te:'1 వారంలో', finding_bn:'গুরুত্বপূর্ণ পরিবর্তন — জরুরি মনোযোগ দরকার', urgency_bn:'জরুরি মনোযোগ দরকার', when_bn:'1 সপ্তাহের মধ্যে', finding_mr:'महत्त्वाचे बदल — तातडीने लक्ष द्या', urgency_mr:'तातडीने लक्ष आवश्यक', when_mr:'1 आठवड्याच्या आत'}
+  };
+  const m=mapRisk[risk];
+  let tpl=translations[lang]||translations.en;
+  tpl=tpl.replaceAll('{name}',name).replaceAll('{finding}',m.finding).replaceAll('{urgency}',m.urgency).replaceAll('{when}',m.when)
+         .replaceAll('{finding_hi}',m.finding_hi).replaceAll('{urgency_hi}',m.urgency_hi).replaceAll('{when_hi}',m.when_hi)
+         .replaceAll('{finding_ta}',m.finding_ta).replaceAll('{urgency_ta}',m.urgency_ta).replaceAll('{when_ta}',m.when_ta)
+         .replaceAll('{finding_te}',m.finding_te).replaceAll('{urgency_te}',m.urgency_te).replaceAll('{when_te}',m.when_te)
+         .replaceAll('{finding_bn}',m.finding_bn).replaceAll('{urgency_bn}',m.urgency_bn).replaceAll('{when_bn}',m.when_bn)
+         .replaceAll('{finding_mr}',m.finding_mr).replaceAll('{urgency_mr}',m.urgency_mr).replaceAll('{when_mr}',m.when_mr);
+  document.getElementById('patientExplain').innerHTML=tpl;
+  const prog = risk==='Low'?28:risk==='Medium'?62:88;
+  document.getElementById('langProgress').style.width=prog+'%';
+ }
+
+ function speakExplanation(){
+  const text = document.getElementById('patientExplain').innerText;
+  const lang = document.getElementById('langSelect').value;
+  const utter = new SpeechSynthesisUtterance(text);
+  const langMap={en:'en-IN',hi:'hi-IN',ta:'ta-IN',te:'te-IN',bn:'bn-IN',mr:'mr-IN'};
+  utter.lang=langMap[lang]||'en-IN';
+  utter.rate=0.95;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utter);
+  showToast('Playing audio — '+lang.toUpperCase());
+ }
+ function stopSpeak(){ speechSynthesis.cancel(); showToast('Audio stopped'); }
+
+ document.getElementById('opacityRange').addEventListener('input', e=>{ document.getElementById('heatOverlay').style.opacity=e.target.value/100; });
+
+ function generateReferral(){
+  if(!currentPatient || !currentResult) return;
+  const content = `
+   <div class="flex items-center justify-between border-b pb-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-navy text-white flex items-center justify-center"><i data-lucide="eye" class="w-4 h-4"></i></div><div><div class="font-bold text-navy">VisionCare AI — Referral Slip</div><div class="text-xs text-slate-500">Screening support • Not a diagnosis</div></div></div><span class="text-xs font-mono bg-slate-900 text-white px-2.5 py-1 rounded-full">${currentPatient.id}</span></div>
+   <div class="grid grid-cols-2 gap-3 mt-4 text-xs">
+    <div class="bg-slate-50 border border-line rounded-xl p-3"><div class="text-slate-500">Patient</div><div class="font-semibold">${currentPatient.name} • ${currentPatient.age}y • ${currentPatient.gender}</div><div class="text-slate-600">${currentPatient.village}</div></div>
+    <div class="bg-slate-50 border border-line rounded-xl p-3"><div class="text-slate-500">Screening</div><div class="font-semibold">${new Date().toLocaleDateString('en-IN')} • Right Eye</div><div class="text-slate-600">Quality: ${currentResult.quality} • Confidence: ${currentResult.confidence} (demo)</div></div>
+   </div>
+   <div class="mt-4 p-4 rounded-xl border-2 ${currentResult.risk==='High'?'border-rose-300 bg-rose-50':currentResult.risk==='Medium'?'border-amber-300 bg-amber-50':'border-emerald-300 bg-emerald-50'}">
+    <div class="font-bold ${currentResult.risk==='High'?'text-rose-800':currentResult.risk==='Medium'?'text-amber-800':'text-emerald-800'}">${currentResult.result} — ${currentResult.risk} RISK</div>
+    <div class="text-sm mt-1">${currentResult.desc}</div>
+    <div class="text-xs mt-2 opacity-80">AI attention: ${currentResult.risk==='Low'?'Minimal influential regions':'Clusters near arcade & temporal exudates (see attention map)'} — to be confirmed by ophthalmologist.</div>
+   </div>
+   <div class="mt-4 text-xs leading-relaxed text-slate-700">
+    <div class="font-semibold">Advice for patient (local language on reverse):</div>
+    <div>${document.getElementById('patientExplain').innerText}</div>
+    <div class="mt-3 flex items-center gap-2 text-[11px]"><span class="px-2 py-1 rounded-full bg-slate-900 text-white font-mono">Demo referral • Prototype</span><span>Health worker signature: ___________________</span></div>
+   </div>
+  `;
+  document.getElementById('referralContent').innerHTML=content;
+  document.getElementById('referralModal').classList.remove('hidden');
+  lucide.createIcons();
+ }
+ function closeReferral(){ document.getElementById('referralModal').classList.add('hidden'); }
+ function shareReport(){ generateReferral(); }
+
+ // History & Dashboard
+ function renderHistory(){
+  const q = document.getElementById('historySearch').value.toLowerCase();
+  const f = document.getElementById('historyFilter').value;
+  const filtered = patients.filter(p=>{
+   const matchQ = !q || (p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q) || p.village.toLowerCase().includes(q));
+   const matchF = f==='all' || p.risk===f;
+   return matchQ && matchF;
+  });
+  const body=document.getElementById('historyBody');
+  body.innerHTML = filtered.map(p=>`
+   <tr class="hover:bg-slate-50">
+    <td class="px-6 py-3"><div class="font-semibold text-navy">${p.name}</div><div class="text-xs text-slate-500">${p.id} • ${p.village}</div></td>
+    <td class="px-3 py-3 text-xs">${p.date}</td>
+    <td class="px-3 py-3 text-xs leading-tight">${p.result}</td>
+    <td class="px-3 py-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${p.risk==='High'?'bg-rose-600 text-white':p.risk==='Medium'?'bg-amber-400 text-amber-900':'bg-emerald-100 text-emerald-800 border border-emerald-200'}">${p.risk}</span></td>
+    <td class="px-3 py-3 text-xs">${p.quality}</td>
+    <td class="px-6 py-3"><button onclick="openPatient('${p.id}')" class="px-3 py-1.5 rounded-full bg-navy text-white text-xs font-semibold">View</button></td>
+   </tr>
+  `).join('') || `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No records found</td></tr>`;
+  document.getElementById('historyCount').textContent=filtered.length;
+  // timeline
+  const tl=document.getElementById('timeline');
+  tl.innerHTML = filtered.slice(0,6).map(p=>`
+   <div class="relative">
+    <span class="absolute -left-[29px] top-1 w-3 h-3 rounded-full ${p.risk==='High'?'bg-rose-600':p.risk==='Medium'?'bg-amber-500':'bg-emerald-500'} border-2 border-white shadow"></span>
+    <div class="bg-white border border-line rounded-xl p-3">
+     <div class="flex items-center justify-between"><span class="font-semibold text-sm">${p.name} • ${p.risk} risk</span><span class="text-xs text-slate-500">${p.date}</span></div>
+     <div class="text-xs text-slate-600">${p.result} • Quality: ${p.quality}</div>
+    </div>
+   </div>
+  `).join('');
+ }
+
+ function openPatient(id){
+  const p = patients.find(x=>x.id===id);
+  if(!p) return;
+  // set as current and show results
+  currentPatient = {id:p.id,name:p.name,age:p.age,gender:p.gender,village:p.village,diabetes:p.diabetes,lastScreen:p.lastScreen};
+  currentResult = {risk:p.risk, confidence:p.confidence, quality:p.quality, result:p.result, desc: p.risk==='High'?'Urgent referral — within 1 week':p.risk==='Medium'?'Refer within 2–4 weeks':'Routine — 6–12 months'};
+  selectedDataUrl=p.image;
+  document.getElementById('resOriginal').src=p.image;
+  document.getElementById('resHeatBase').src=p.image;
+  populateResults();
+  showPage('results');
+ }
+
+ function clearHistory(){
+  if(confirm('Clear all local demo records?')){ patients=[...demoPatients]; savePatients(); renderHistory(); renderDashboard(); showToast('Demo data restored'); }
+ }
+
+ function renderDashboard(){
+  const total=patients.length;
+  const referred=patients.filter(p=>p.risk==='Medium'||p.risk==='High').length;
+  const high=patients.filter(p=>p.risk==='High').length;
+  document.getElementById('mTotal').textContent=total;
+  document.getElementById('mReferred').textContent=referred;
+  document.getElementById('mHigh').textContent=high;
+  document.getElementById('mQueue').textContent= (ruralMode? pendingQueue+' pending' : '0 pending');
+  const low=patients.filter(p=>p.risk==='Low').length, med=patients.filter(p=>p.risk==='Medium').length;
+  const max=Math.max(low,med,high,1);
+  document.getElementById('riskBars').innerHTML=`
+   <div><div class="flex justify-between text-xs font-semibold"><span>Low</span><span>${low}</span></div><div class="h-2 bg-slate-100 rounded-full overflow-hidden border border-line"><div class="h-full bg-emerald-500" style="width:${(low/max*100)}%"></div></div></div>
+   <div><div class="flex justify-between text-xs font-semibold"><span>Medium</span><span>${med}</span></div><div class="h-2 bg-slate-100 rounded-full overflow-hidden border border-line"><div class="h-full bg-amber-500" style="width:${(med/max*100)}%"></div></div></div>
+   <div><div class="flex justify-between text-xs font-semibold"><span>High</span><span>${high}</span></div><div class="h-2 bg-slate-100 rounded-full overflow-hidden border border-line"><div class="h-full bg-rose-600" style="width:${(high/max*100)}%"></div></div></div>
+  `;
+  document.getElementById('dashBody').innerHTML = patients.slice(0,6).map(p=>`
+   <tr><td class="py-2.5"><div class="font-semibold">${p.name}</div><div class="text-xs text-slate-500">${p.village}</div></td><td><span class="px-2 py-1 rounded-full text-xs font-bold ${p.risk==='High'?'bg-rose-100 text-rose-700 border border-rose-200':p.risk==='Medium'?'bg-amber-100 text-amber-800 border border-amber-200':'bg-emerald-50 text-emerald-700 border border-emerald-200'}">${p.risk}</span></td><td class="text-xs">${p.risk==='High'?'Urgent — 1 week':p.risk==='Medium'?'2–4 weeks':'Routine'}</td><td class="text-xs">${ruralMode && p===patients[0] ? '<span class="px-2 py-1 rounded-full bg-amber-50 border border-amber-200">Pending Sync</span>' : '<span class="text-emerald-600">● Done</span>'}</td></tr>
+  `).join('');
+ }
+
+ function showToast(msg){
+  const t=document.getElementById('toast'); document.getElementById('toastMsg').textContent=msg; t.classList.remove('hidden');
+  setTimeout(()=>t.classList.add('hidden'), 2200);
+ }
+
+ // Presentation Mode
+ let presStep=0;
+ function startPresentation(){
+  presStep=0;
+  showPage('home');
+  showToast('Presentation Mode — auto walkthrough started');
+  setTimeout(()=>{ showPage('register'); fillDemoPatient(); }, 1100);
+  setTimeout(()=>{ document.getElementById('registerForm').requestSubmit(); }, 2400);
+  setTimeout(()=>{ useSampleImage(); }, 3400);
+  setTimeout(()=>{ startAnalysis(); }, 4200);
+ }
+
+ // init
+ loadPatients();
+ renderHistory();
+ renderDashboard();
+ updateContextCard();
+ document.getElementById('queueCount').textContent='0';
+</script>
+</body>
+</html>
